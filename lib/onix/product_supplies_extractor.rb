@@ -20,7 +20,7 @@ module ONIX
     #                :from_date=>date,
     #                :until_date=>date,
     #                :tax=>{:amount=>int, :rate_percent=>float}}]}]
-    def supplies(keep_all_prices_dates = false)
+    def supplies(keep_all_prices_dates = false, fallback_territory=[])
       supplies = []
 
       # add territories if missing
@@ -48,6 +48,8 @@ module ONIX
                 if supply[:territory].length == 0
                   if @publishing_detail
                     supply[:territory] = self.countries_rights
+                  elsif fallback_territory && fallback_territory.length > 0
+                    supply[:territory] = fallback_territory
                   end
                 end
               else
