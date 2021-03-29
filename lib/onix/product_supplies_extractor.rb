@@ -20,9 +20,12 @@ module ONIX
     #                :from_date=>date,
     #                :until_date=>date,
     #                :tax=>{:amount=>int, :rate_percent=>float}}]}]
-    def supplies(keep_all_prices_dates = false, fallback_territory=[])
-      supplies = []
+    def supplies(keep_all_prices_dates = false, fallback_territory=["NL"], print=false)
+      if @supplies
+        return @supplies
+      end
 
+      supplies = []
       # add territories if missing
       if self.product_supplies
         self.product_supplies.each do |ps|
@@ -46,7 +49,7 @@ module ONIX
                 supply[:territory] = ps.countries
 
                 if supply[:territory].length == 0
-                  if @publishing_detail
+                  if @publishing_detail && self.countries_rights.length > 0
                     supply[:territory] = self.countries_rights
                   elsif fallback_territory && fallback_territory.length > 0
                     supply[:territory] = fallback_territory
@@ -72,6 +75,8 @@ module ONIX
         end
       end
 
+      p "SUPPLIES #1", supplies if print
+
       grouped_supplies = {}
       supplies.each do |supply|
         supply[:territory].each do |territory|
@@ -80,6 +85,8 @@ module ONIX
           grouped_supplies[pr_key] << supply
         end
       end
+
+      p "GSUP #1", grouped_supplies if print
 
       nb_suppliers = supplies.map { |s| s[:suppliers][0].name }.uniq.length
       # render prices sequentially with dates
@@ -124,6 +131,8 @@ module ONIX
         grouped_territories_supplies[pr_key] << supply
       end
 
+      p "GTTSUP #1", grouped_territories_supplies.length, grouped_territories_supplies if print
+
       supplies = []
 
       grouped_territories_supplies.each do |ksup, supply|
@@ -146,7 +155,8 @@ module ONIX
                      }}
       end
 
-      supplies
+      @supplies = supplies
+      @supplies
     end
 
     # add missing periods when they can be guessed
@@ -231,6 +241,22 @@ module ONIX
           false
         end
       }
+    end
+
+    def next_earliest_price_amount_for(currency, country = nil)
+      sups = self.supplies_with_default_tax.select { |p| p[:currency] == currency }
+      if country
+        sups = sups.select { |p| p[:territory].include?(country) }
+      end
+      if sups.length > 0
+        prices = sups.first[:prices].sort_by do |price|
+          price[:from_date].to_date
+        end
+
+        return prices.first[:amount]
+      else
+        nil
+      end
     end
 
     # price amount for given +currency+ and country at time
